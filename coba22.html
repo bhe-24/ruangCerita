@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ruangan Cerita</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #fefefe;
+      color: #333;
+    }
+
+    header {
+      background: #ff6b6b;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 1.5em;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+    }
+
+    nav button {
+      flex: 1;
+      padding: 12px;
+      background: none;
+      border: none;
+      font-size: 1em;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+    }
+
+    nav button.active {
+      border-color: #ff6b6b;
+      font-weight: bold;
+      color: #ff6b6b;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    form input, form textarea {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    form button {
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      padding: 12px;
+      width: 100%;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .message {
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .story-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .story-card {
+      background: #fff7f7;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .story-card h3 {
+      margin: 0;
+      color: #ff6b6b;
+    }
+
+    .story-card p {
+      margin: 10px 0 0;
+    }
+
+    .story-card .meta {
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .delete-btn {
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      font-size: 0.9em;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Ruangan Cerita</header>
+
+  <nav>
+    <button class="active" onclick="showTab('write')">Tulis Cerita</button>
+    <button onclick="showTab('list')">Daftar Cerita</button>
+  </nav>
+
+  <div class="container">
+    <div id="write">
+      <form id="storyForm">
+        <input type="text" name="judul" placeholder="Judul Cerita" required />
+        <textarea name="isi" rows="6" placeholder="Isi Cerita..." required></textarea>
+        <input type="text" name="nama" placeholder="Namamu" required />
+        <button type="submit">Kirim Cerita</button>
+        <div class="message" id="message"></div>
+      </form>
+    </div>
+
+    <div id="list" style="display:none;">
+      <div class="story-list" id="storyList">Memuat cerita...</div>
+    </div>
+  </div>
+
+  <script>
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxmi6svSOoPv989Ga2mIIDCkuWyLD0OXd1Rn6vRG77zI9K0fw9Q1tW_Nys_Zid30ZjBfA/exec';
+    const form = document.getElementById('storyForm');
+    const message = document.getElementById('message');
+    const storyList = document.getElementById('storyList');
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const data = new FormData(form);
+
+      fetch(scriptURL, { method: 'POST', body: data })
+        .then(response => {
+          message.textContent = "Cerita berhasil dikirim!";
+          form.reset();
+          loadStories(); // Refresh daftar cerita
+        })
+        .catch(error => {
+          message.textContent = "Gagal mengirim cerita.";
+          console.error(error);
+        });
+    });
+
+    function showTab(tab) {
+      document.getElementById('write').style.display = tab === 'write' ? 'block' : 'none';
+      document.getElementById('list').style.display = tab === 'list' ? 'block' : 'none';
+      document.querySelectorAll("nav button").forEach(btn => btn.classList.remove("active"));
+      document.querySelector(`nav button[onclick="showTab('${tab}')"]`).classList.add("active");
+      if (tab === 'list') loadStories();
+    }
+
+    function loadStories() {
+      storyList.innerHTML = "Memuat cerita...";
+      fetch(scriptURL)
+        .then(res => res.json())
+        .then(data => {
+          if (!data || data.length === 0) {
+            storyList.innerHTML = "<p>Belum ada cerita.</p>";
+            return;
+          }
+
+          storyList.innerHTML = data.map(cerita => `
+            <div class="story-card">
+              <h3>${cerita.judul}</h3>
+              <p>${cerita.isi.replace(/\n/g, '<br>')}</p>
+              <div class="meta">Oleh ${cerita.nama} | ${cerita.tanggal}</div>
+              <button class="delete-btn" onclick="deleteStory('${cerita.rowId}')">Hapus Cerita</button>
+            </div>
+          `).join('');
+        })
+        .catch(err => {
+          storyList.innerHTML = "<p>Gagal memuat cerita.</p>";
+          console.error(err);
+        });
+    }
+
+    function deleteStory(rowId) {
+      if (!confirm("Apakah Anda yakin ingin menghapus cerita ini?")) return;
+
+      fetch(scriptURL + '?action=delete&rowId=' + rowId)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert("Cerita berhasil dihapus!");
+            loadStories(); // Refresh daftar cerita
+          } else {
+            alert("Gagal menghapus cerita.");
+          }
+        })
+        .catch(error => {
+          alert("Terjadi kesalahan saat menghapus cerita.");
+          console.error(error);
+        });
+    }
+  </script>
+
+</body>
+</html>
